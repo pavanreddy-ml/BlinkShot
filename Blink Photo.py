@@ -5,14 +5,14 @@ from math import hypot
 import time
 import threading
 import concurrent.futures
-
+from playsound import playsound
 
 cap = cv2.VideoCapture(0)
 
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 
-font = cv2.FONT_HERSHEY_PLAIN
+font = cv2.FONT_HERSHEY_DUPLEX
 
 left_eye = False                #True when left eye is closed
 right_eye = False               #True when right eye is closed
@@ -21,21 +21,23 @@ check_flag = False              #Checks if eye is open or close. If both eyes ar
 save_flag = False               #If True will save the frame and display it. If False will display camera video.
 countdown = 0                   #Variable used to countdown when the photo capture will happen.
 clicking = False                #True if clicking is in progress. Clicking starts when the click_flag is set to True and stops when the program is ready to click again.
+save_to_memory = True           #True to save to memory
+save = save_to_memory
 
-
-
-
-def midpoint(pt1, pt2):
+def midpoint(pt1, pt2):                                         #Calculate the midpoint
     return int((pt1.x + pt2.x)/2), int((pt1.y + pt2.y)/2)
 
 
 def get_lines(img, face):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
     x, y = face.left(), face.top()
     x1, y1 = face.right(), face.bottom()
-    rect_diag = hypot(x - x1, y - y1)
+    rect_area = hypot(x - x1, y - y1)
     cv2.rectangle(img, (x, y), (x1, y1), (0, 255, 0), 2)
 
     landmarks = predictor(gray, face)
+
     le_left_point = (landmarks.part(36).x, landmarks.part(36).y)
     le_right_point = (landmarks.part(39).x, landmarks.part(39).y)
     cv2.line(img, le_left_point, le_right_point, (0, 0, 255), 1)
@@ -60,7 +62,7 @@ def get_lines(img, face):
     re_hor_line = hypot(re_right_point[0] - re_left_point[0], re_right_point[1] - re_right_point[1])
     right_ratio = re_hor_line / re_ver_line
 
-    return img, rect_diag, left_ratio, right_ratio
+    return img, rect_area, left_ratio, right_ratio
 
 
 def check_blink():
@@ -70,7 +72,7 @@ def check_blink():
     if check_flag == True:
         for i in range(20):
             time.sleep(0.1)
-            print(i)
+            # print(i)
             if check_flag == False:
                 end = True
                 break
@@ -84,6 +86,7 @@ def check_blink():
 def click():
     global countdown, save_flag, clicking
 
+    playsound('beep-09.mp3')
     clicking =True
 
     countdown = 3
@@ -98,11 +101,15 @@ def click():
 
 
 def reset_save():
-    global countdown, clicking
+    global countdown, clicking, reset_camera, save
 
     time.sleep(3)
     countdown = 0
     clicking = False
+    if save_to_memory == True:
+        save = True
+    else:
+        save = False
 
 
 
@@ -113,13 +120,15 @@ t3 = threading.Thread(target=reset_save)
 
 while True:
     ret, frame = cap.read()
+    current_frame = frame.copy()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     faces = detector(gray)
-    for face in faces:
-        int_frame, rect_diag, left_ratio, right_ratio = get_lines(frame, face)
 
-    blink_thresh = rect_diag/70
+    for face in faces:
+        frame, rect_area, left_ratio, right_ratio = get_lines(frame, face)
+
+    blink_thresh = rect_area/55
 
     if left_ratio > blink_thresh:
         left_eye = True
@@ -151,11 +160,19 @@ while True:
         else:
             check_flag = False
 
-    #print(countdown)
+    if (left_eye == True) & (right_eye == True):
+        cv2.putText(frame, "BLINK", (50, 50), font, 1.5, (255, 0, 0), 2)
+
+    if (countdown != 'click') & (countdown != 0):
+        cv2.putText(current_frame, str(countdown), (50, 50), font, 1.5, (255, 0, 0), 2)
+
     if countdown == 'click':
         if save_flag == True:
-            saved_image = frame
+            camera_front = current_frame
             save_flag = False
+            if save == True:
+                cv2.imwrite("image.jpg", camera_front)
+                save = False
             if not t3.is_alive():
                 try:
                     t3.start()
@@ -163,18 +180,13 @@ while True:
                     t3 = threading.Thread(target=reset_save)
                     t3.start()
 
+
     else:
-        saved_image = frame
+        camera_front = current_frame
 
 
-
-    if left_eye & right_eye:
-        cv2.putText(frame, "BLINK", (50, 150), font, 3, (255, 0, 0), 2)
-
-
-
-    cv2.imshow('frame', int_frame)
-    cv2.imshow('cam', frame)
+    cv2.imshow('Backend', frame)
+    cv2.imshow('camera', camera_front)
 
     key = cv2.waitKey(1)
     if key == 27:
