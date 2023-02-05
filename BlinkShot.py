@@ -8,7 +8,7 @@ import concurrent.futures
 from playsound import playsound
 
 class BlinkShot():
-    def __init__(self):
+    def __init__(self, save_image=True):
         self.left_eye = False  # True when left eye is closed
         self.right_eye = False  # True when right eye is closed
         self.click_flag = False  # Trigger for Click. If eyes are closed for more than 2 seconds, it will be True. Once True, will trigger the click function
@@ -16,7 +16,7 @@ class BlinkShot():
         self.save_flag = False  # If True will save the frame and display it. If False will display camera video.
         self.countdown = 0  # Variable used to countdown when the photo capture will happen.
         self.clicking = False  # True if clicking is in progress. Clicking starts when the click_flag is set to True and stops when the program is ready to click again.
-        self.save_to_memory = True  # True to save to memory
+        self.save_to_memory = save_image  # True to save to memory
         self.save = self.save_to_memory
 
         self.font = cv2.FONT_HERSHEY_DUPLEX
@@ -185,7 +185,7 @@ class BlinkShot():
                 break
 
 
-bs = BlinkShot()
+bs = BlinkShot(save_image=False)
 bs.set_cap()
 bs.run_app()
 
